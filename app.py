@@ -1,41 +1,23 @@
-import streamlit as st
-import requests
-import os
-import tempfile
+import whisper
+import gradio as gr
 
-st.title("🎧 Transcriptor de audio con IA (API de OpenAI)")
+# Cargar modelo de Whisper
+model = whisper.load_model("base")
 
-st.markdown("Sube tu archivo de audio y se transcribirá automáticamente usando el modelo `whisper-1` de OpenAI.")
+# Función de transcripción
+def transcribe(audio):
+    if audio is None:
+        return "Por favor, sube un archivo de audio."
+    result = model.transcribe(audio)
+    return result["text"]
 
-openai_api_key = st.text_input("🔑 Ingresa tu clave de API de OpenAI", type="password")
+# Interfaz con Gradio
+interface = gr.Interface(
+    fn=transcribe,
+    inputs=gr.Audio(sources=["upload"], type="filepath", label="Sube tu audio (MP3, WAV, etc.)"),
+    outputs="text",
+    title="Transcriptor de Audio",
+    description="Sube tu archivo de audio y obtén la transcripción automáticamente usando Whisper.",
+)
 
-uploaded_file = st.file_uploader("📤 Sube tu archivo de audio", type=["mp3", "wav", "m4a", "webm", "ogg", "opus"])
-
-if uploaded_file and openai_api_key:
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(uploaded_file.read())
-        tmp_path = tmp.name
-
-    st.info("⏳ Enviando archivo a OpenAI para transcripción...")
-
-    with open(tmp_path, "rb") as audio_file:
-        response = requests.post(
-            "https://api.openai.com/v1/audio/transcriptions",
-            headers={
-                "Authorization": f"Bearer {openai_api_key}"
-            },
-            files={
-                "file": (uploaded_file.name, audio_file, "audio/mpeg")
-            },
-            data={
-                "model": "whisper-1"
-            }
-        )
-
-    if response.status_code == 200:
-        result = response.json()
-        st.success("✅ Transcripción completada:")
-        st.text_area("📄 Texto transcrito:", result["text"], height=250)
-    else:
-        st.error("❌ Error en la transcripción:")
-        st.json(response.json())
+interface.launch()
