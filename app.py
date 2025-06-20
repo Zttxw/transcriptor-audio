@@ -1,39 +1,41 @@
 import streamlit as st
-import whisper
+import requests
+import os
 import tempfile
 
-# CSS personalizado
-st.markdown("""
-    <style>
-    .main-title {
-        font-size:38px;
-        text-align:center;
-        color:#4F8BF9;
-        margin-bottom: 10px;
-    }
-    .sub-text {
-        text-align:center;
-        color: #888;
-        font-size: 16px;
-    }
-    </style>
-    <div class="main-title">🎧 Transcriptor de Audio con IA</div>
-    <div class="sub-text">Convierte archivos de audio a texto con un solo clic</div>
-""", unsafe_allow_html=True)
+st.title("🎧 Transcriptor de audio con IA (API de OpenAI)")
 
-st.sidebar.title("ℹ️ Ayuda")
-st.sidebar.markdown("**Formatos compatibles**: MP3, WAV, OGG, M4A, OPUS")
+st.markdown("Sube tu archivo de audio y se transcribirá automáticamente usando el modelo `whisper-1` de OpenAI.")
 
-uploaded_file = st.file_uploader("📤 Sube tu archivo", type=["mp3", "wav", "ogg", "m4a", "opus", "webm"])
+openai_api_key = st.text_input("🔑 Ingresa tu clave de API de OpenAI", type="password")
 
-if uploaded_file:
+uploaded_file = st.file_uploader("📤 Sube tu archivo de audio", type=["mp3", "wav", "m4a", "webm", "ogg", "opus"])
+
+if uploaded_file and openai_api_key:
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp.write(uploaded_file.read())
-        audio_path = tmp.name
+        tmp_path = tmp.name
 
-    st.info("⏳ Transcribiendo...")
-    model = whisper.load_model("base")
-    result = model.transcribe(audio_path)
+    st.info("⏳ Enviando archivo a OpenAI para transcripción...")
 
-    st.success("✅ Transcripción completa:")
-    st.text_area("📄 Texto:", result["text"], height=250)
+    with open(tmp_path, "rb") as audio_file:
+        response = requests.post(
+            "https://api.openai.com/v1/audio/transcriptions",
+            headers={
+                "Authorization": f"Bearer {openai_api_key}"
+            },
+            files={
+                "file": (uploaded_file.name, audio_file, "audio/mpeg")
+            },
+            data={
+                "model": "whisper-1"
+            }
+        )
+
+    if response.status_code == 200:
+        result = response.json()
+        st.success("✅ Transcripción completada:")
+        st.text_area("📄 Texto transcrito:", result["text"], height=250)
+    else:
+        st.error("❌ Error en la transcripción:")
+        st.json(response.json())
